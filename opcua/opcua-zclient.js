@@ -2,9 +2,9 @@ module.exports = function (RED) {
     "use strict";
     let chalk = require("chalk");
     let opcua = require('node-opcua');
-    let opcuaBasics = require('./opcua-basics');
-    let crypto_utils = opcua.crypto_utils;
-    let fileTransfer = require("node-opcua-file-transfer");
+    // let opcuaBasics = require('./opcua-basics');
+    // let crypto_utils = opcua.crypto_utils;
+    // let fileTransfer = require("node-opcua-file-transfer");
     let async = require("async");
     let fs = require("fs");
     let os = require("os");
@@ -13,7 +13,7 @@ module.exports = function (RED) {
     let AttributeIds = opcua.AttributeIds;
     let TimestampsToReturn = opcua.TimestampsToReturn;
 
-    const { createClientCertificateManager } = require("./utils");
+    // const { createClientCertificateManager } = require("./utils");
     function opcuaZclient(n) {
         RED.nodes.createNode(this, n);
 
@@ -23,7 +23,8 @@ module.exports = function (RED) {
         //客户端存储
         let zclients = {};
         let zsessions = {};
-
+        let zclientRetry = {};
+        let zclientFail = {};
 
         let zlog = {
             error: function (msg) {
@@ -37,8 +38,18 @@ module.exports = function (RED) {
             log: function (msg) {
                 console.log("zlog:", msg);
                 node.log(chalk.blue(msg));
+            },
+            statusShow: function (msg) {
+                let text = `
+                    客户端数量: ${Object.keys(zclients).length}
+                    会话数量: ${Object.keys(zsessions).length}
+                    尝试连接: ${Object.keys(zclientRetry).length}
+                    失败连接: ${Object.keys(zclientFail).length}
+                `;
+                node.status({ fill: "green", shape: "dot", text: text });
             }
         }
+
         function zclientOutput(o1 = null, o2 = null, o3 = null) {
             node.send([o1, o2, o3]);
         }
@@ -66,16 +77,35 @@ module.exports = function (RED) {
                 zlog.error("Error: endpointUrl is not set");
                 return;
             }
+            // if (msg.retryFail && opts.connectionStrategy) {
+            //     opts.connectionStrategy.maxRetry = 0;
+            // }
             if (zclients[opts.endpointUrl]) {
                 // zlog.warn(`warn: opts.endpointUrl } client already exists`);
-                readMultiple(opts.endpointUrl, msg);
+
+                if (zsessions[opts.endpointUrl]) {
+                    readMultiple(opts.endpointUrl, msg);
+                } else {
+                    // if (msg.retryFail) {
+                    //     zlog.log(`${opts.endpointUrl} Client retry`);
+                    //     delete zclientFail[opts.endpointUrl];
+                    //     zclientRetry[opts.endpointUrl] = opts.endpointUrl;
+                    //     zclients[opts.endpointUrl].close()
+                    //     zclients[opts.endpointUrl] = _createClient(opts, msg);
+                    //     zlog.statusShow();
+                    // }
+                }
                 return;
             }
+            zclients[opts.endpointUrl] = _createClient(opts, msg);
+            zlog.statusShow();
+            return zclients[opts.endpointUrl];
+        }
+        function _createClient(opts, msg) {
             let client = null;
             try {
                 client = opcua.OPCUAClient.create(opts);
-                zclients[opts.endpointUrl] = client;
-                initClientEvent(client);
+                initClientEvent(client, opts, msg);
                 zlog.log(`${opts.endpointUrl} Client created`);
                 connectClient(client, opts, msg);
             } catch (error) {
@@ -136,7 +166,7 @@ module.exports = function (RED) {
                         error: err.message,
                         endpoint: endpointUrl,
                     }
-                    zclientOutput(null, copyNewMsg(msg,payload), null);
+                    zclientOutput(null, copyNewMsg(msg, payload), null);
                     return;
                 }
                 for (let i = 0; i < dataValues.length; i++) {
@@ -161,13 +191,13 @@ module.exports = function (RED) {
                                 serverTimestamp: serverTs,
                                 sourceTimestamp: sourceTs
                             };
-                            zclientOutput(copyNewMsg(msg,payload), null, null);
+                            zclientOutput(copyNewMsg(msg, payload), null, null);
                         } catch (error) {
                             let payload = {
                                 error: error.message,
                                 endpoint: endpointUrl,
                             }
-                            zclientOutput(null, copyNewMsg(msg,payload), null);
+                            zclientOutput(null, copyNewMsg(msg, payload), null);
                             return;
                         }
                     }
@@ -176,19 +206,24 @@ module.exports = function (RED) {
                 msg.payload = dataValues;
                 zclientOutput(null, null, msg);
             });
+            zlog.statusShow();
         }
-        function copyNewMsg(msg,payload) {
+        function copyNewMsg(msg, payload) {
             let newMsg = cloneDeep(msg);
             newMsg.payload = payload;
             return newMsg;
         }
-        function initClientEvent(client) {
+
+        function initClientEvent(client, opts, msg) {
             //当初始连接成功时触发此事件。
             client.on("connected", function () {
                 zlog.log("Client connected to OPC UA server");
             })
             client.on("connection_failed", function (err) {
                 zlog.error("Client connection failed: " + err.message);
+                delete zclientRetry[opts.endpointUrl];
+                zclientFail[opts.endpointUrl] = opts.endpointUrl;
+                zlog.statusShow();
             });
             client.on("start_reconnection", function () {
                 zlog.log("Client start reconnection");
@@ -199,6 +234,8 @@ module.exports = function (RED) {
             });
             client.on("backoff", function (retry, delay) {
                 zlog.log("Client backoff: retry=" + retry + ", delay=" + delay);
+                zclientRetry[opts.endpointUrl] = opts.endpointUrl;
+                zlog.statusShow();
             });
             client.on("closed", function () {
                 zlog.log("Client closed");
@@ -221,9 +258,27 @@ module.exports = function (RED) {
             createClient(msg);
         }
         function onClose(done) {
-            done();
+            Object.keys(zsessions).forEach((endpointUrl) => {
+                let session = zsessions[endpointUrl];
+                if (session) {
+                    session.close(function (err) {
+                        if (err) {
+                            zlog.error("Error closing session: " + err.message);
+                        } else {
+                            zlog.log("Session closed");
+                        }
+                    });
+                    delete zsessions[endpointUrl];
+                }
+                done();
+            })
+            zclients = {};
+            zclientRetry = {};
+            zclientFail = {};
+            zlog.statusShow();
         }
         function onError(msg) {
+            zlog.error("Error: " + msg.error);
         }
         node.on("input", onInput);
         node.on("close", onClose);

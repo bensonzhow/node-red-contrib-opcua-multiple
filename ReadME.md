@@ -14,7 +14,9 @@ npm install opcua-zclient
 ## 连接到OPC UA服务器
 
 msg.nodeIds: 需要读取的所有节点的配置
+
 msg.optuaConfig: 连接OPC UA服务器的配置，参考 node-opcua: OPCUAClientOptions
+
 msg.userIdentity: 连接OPC UA服务器的校验信息
 
 ## 贡献
