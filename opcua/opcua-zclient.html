@@ -1,0 +1,27 @@
+<!-- 向编辑器注册的主节点定义 -->
+<script type="text/javascript">
+  RED.nodes.registerType('OpcUa-Zclient', {
+      category: "zopcua",
+      color:"#3FADB5",
+      defaults: {
+          name: {value: ""}
+      },
+      inputs: 1,
+      outputs: 3,
+      icon: "opcuanodeLogo.png",
+      label: function () {
+          return this.name || 'OpcUa-Zclient';
+      }
+  });
+</script>
+<!-- 编辑对话框 -->
+<script type="text/html" data-template-name="OpcUa-Zclient">
+  <div class="form-row">
+      <label for="node-input-name"><i class="fa fa-tag"></i> 名称</label>
+      <input type="text" id="node-input-name" placeholder="名称"/>
+  </div>
+</script>
+<!-- 帮助文本 -->
+<script type="text/html" data-help-name="OpcUa-Zclient">
+  <p>OpcUa-Zclient</p>
+</script>
