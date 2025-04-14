@@ -1,0 +1,181 @@
+[
+    {
+        "id": "f305aa8d4288451f",
+        "type": "OpcUa-Zclient",
+        "z": "d184af798b202984",
+        "name": "",
+        "x": 1340,
+        "y": 660,
+        "wires": [
+            [
+                "e4a311565af8996f"
+            ],
+            [
+                "d4388fd20cce8b0a"
+            ],
+            [
+                "dd3d9f5cc2be7bf6"
+            ]
+        ]
+    },
+    {
+        "id": "ea1769931090479e",
+        "type": "inject",
+        "z": "d184af798b202984",
+        "name": "轮训读取",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 540,
+        "y": 640,
+        "wires": [
+            [
+                "25c3814b59a071fe"
+            ]
+        ]
+    },
+    {
+        "id": "25c3814b59a071fe",
+        "type": "function",
+        "z": "d184af798b202984",
+        "name": "模拟多设备",
+        "func": "let devices=[\n    {dname:\"a1\",ip:\"10.105.26.100\",port:4840},\n    {dname:\"a2\",ip:\"10.105.26.101\",port:4840},\n    {dname:\"a1\",ip:\"localhost\",port:53880},\n    // {dname:\"a2\",ip:\"localhost\",port:53882},\n]\nmsg.devices=devices;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 730,
+        "y": 640,
+        "wires": [
+            [
+                "028227e74bc3ca65"
+            ]
+        ]
+    },
+    {
+        "id": "028227e74bc3ca65",
+        "type": "split",
+        "z": "d184af798b202984",
+        "name": "",
+        "splt": "\\n",
+        "spltType": "str",
+        "arraySplt": 1,
+        "arraySpltType": "len",
+        "stream": false,
+        "addname": "",
+        "property": "devices",
+        "x": 910,
+        "y": 640,
+        "wires": [
+            [
+                "43bdc8c8d2297c00"
+            ]
+        ]
+    },
+    {
+        "id": "7403119a96cbb113",
+        "type": "function",
+        "z": "d184af798b202984",
+        "name": "连接配置",
+        "func": "const endpointUrl = `opc.tcp://${msg.devices.ip}:${msg.devices.port}`\n\nmsg.optuaConfig={\n    endpointUrl : endpointUrl,\n    login: false,\n    connectionStrategy: {\n        maxRetry: 5, // Limited to max 10 ~5min // 10512000, // 10 years should be enough. No infinite parameter for backoff.\n        initialDelay: 5000, // 5s\n        maxDelay: 30 * 1000 // 30s\n    },\n}\nmsg.retryFail = true;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1100,
+        "y": 680,
+        "wires": [
+            [
+                "f305aa8d4288451f"
+            ]
+        ]
+    },
+    {
+        "id": "e4a311565af8996f",
+        "type": "debug",
+        "z": "d184af798b202984",
+        "name": "单个节点信息",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1560,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "43bdc8c8d2297c00",
+        "type": "function",
+        "z": "d184af798b202984",
+        "name": "读取UA参数值",
+        "func": "const item = [\n    \"ns=4;s=P_Main.fbOpcListe.info_article_path\",\n    \"ns=4;s=P_Main.fbOpcListe.info_article_name_current\",\n    \"ns=4;s=P_Main.fbOpcListe.info_machine_type\",\n    \"ns=4;s=P_Main.fbOpcListe.info_machine_number\",\n    \"ns=4;s=P_Main.fbOpcListe.job_current_runnig_time\",\n    \"ns=4;s=P_Main.fbOpcListe.job_remaining_time\"\n]\nmsg.nodeIds = item;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1100,
+        "y": 640,
+        "wires": [
+            [
+                "7403119a96cbb113"
+            ]
+        ]
+    },
+    {
+        "id": "dd3d9f5cc2be7bf6",
+        "type": "debug",
+        "z": "d184af798b202984",
+        "name": "汇总输出",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1530,
+        "y": 700,
+        "wires": []
+    },
+    {
+        "id": "d4388fd20cce8b0a",
+        "type": "debug",
+        "z": "d184af798b202984",
+        "name": "错误信息",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1540,
+        "y": 660,
+        "wires": []
+    }
+]

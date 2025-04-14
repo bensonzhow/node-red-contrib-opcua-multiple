@@ -134,7 +134,10 @@ module.exports = function (RED) {
                     zlog.log("Session created");
                     // Read multiple, payload contains all nodeIds that will be read
                     readMultiple(opts.endpointUrl, msg);
-
+                    
+                    delete zclientRetry[opts.endpointUrl];
+                    delete zclientFail[opts.endpointUrl];
+                    zlog.statusShow();
                 });
             });
         }

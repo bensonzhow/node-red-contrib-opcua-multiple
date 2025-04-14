@@ -19,6 +19,10 @@ msg.optuaConfig: 连接OPC UA服务器的配置，参考 node-opcua: OPCUAClient
 
 msg.userIdentity: 连接OPC UA服务器的校验信息
 
+导入示例流程：examples/demo.json
+
+![node-red-opcua-zlicnet](images/image.png)
+
 ## 贡献
 
 如果有任何问题或建议，请提交issue或pull request。
